@@ -4,24 +4,26 @@ from freesyntax.structs import AutoLeaf
 
 factory = RuleFactory()
 
-
 @factory.funcdef(
-    Match["def"],
+    Match["define"],
+    Token["STAR"],
     Token["NAME"],
+    Token["STAR"],
     Rule["parameters"],
-    Optional[Match["->"], Rule["test"]],
-    Match["YES"],
-    Rule["suite"],
+    Token["RARROW"],
+    Rule["suite"]
 )
 def fixer(node):
-    node.children[3].replace(AutoLeaf.COLON)
-
+    node.children[0].value = "def "
+    node.children[1].remove()
+    node.children[2].remove()
+    node.children[-2].replace(AutoLeaf.COLON)
 
 print(
     factory.transform(
         """
-def a() YES
-    pass
+define *greet* (name) ->
+    print(Hello, name)
 """
     )
 )
