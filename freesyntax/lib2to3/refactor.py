@@ -185,11 +185,6 @@ class RefactoringTool:
             self.options.update(options)
         self.grammar = pygram.python_grammar.copy()
 
-        if self.options["print_function"]:
-            del self.grammar.keywords["print"]
-        elif self.options["exec_function"]:
-            del self.grammar.keywords["exec"]
-
         # When this is True, the refactor*() methods will call write_file() for
         # files processed even if they were not changed during refactoring. If
         # and only if the refactor method's write parameter was True.
@@ -372,8 +367,6 @@ class RefactoringTool:
             there were errors during the parse.
         """
         features = _detect_future_features(data)
-        if "print_function" in features:
-            self.driver.grammar = pygram.python_grammar_no_print_statement
         try:
             tree = self.driver.parse_string(data)
         except Exception as err:
@@ -722,9 +715,7 @@ class MultiprocessRefactoringTool(RefactoringTool):
         self, items, write=False, doctests_only=False, num_processes=1
     ):
         if num_processes == 1:
-            return super().refactor(
-                items, write, doctests_only
-            )
+            return super().refactor(items, write, doctests_only)
         try:
             import multiprocessing
         except ImportError:
@@ -740,9 +731,7 @@ class MultiprocessRefactoringTool(RefactoringTool):
         try:
             for p in processes:
                 p.start()
-            super().refactor(
-                items, write, doctests_only
-            )
+            super().refactor(items, write, doctests_only)
         finally:
             self.queue.join()
             for i in range(num_processes):
@@ -757,9 +746,7 @@ class MultiprocessRefactoringTool(RefactoringTool):
         while task is not None:
             args, kwargs = task
             try:
-                super().refactor_file(
-                    *args, **kwargs
-                )
+                super().refactor_file(*args, **kwargs)
             finally:
                 self.queue.task_done()
             task = self.queue.get()
@@ -768,6 +755,4 @@ class MultiprocessRefactoringTool(RefactoringTool):
         if self.queue is not None:
             self.queue.put((args, kwargs))
         else:
-            return super().refactor_file(
-                *args, **kwargs
-            )
+            return super().refactor_file(*args, **kwargs)

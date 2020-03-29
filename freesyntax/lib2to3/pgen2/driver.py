@@ -111,26 +111,11 @@ def _generate_pickle_name(gt):
     return head + tail + ".".join(map(str, sys.version_info)) + ".pickle"
 
 
-def load_grammar(
-    gt="Grammar.txt", gp=None, save=True, force=False, logger=None
-):
+def load_grammar(file):
     """Load the grammar (maybe from a pickle)."""
-    if logger is None:
-        logger = logging.getLogger()
-    gp = _generate_pickle_name(gt) if gp is None else gp
-    if force or not _newer(gp, gt):
-        logger.info("Generating grammar tables from %s", gt)
-        g = pgen.generate_grammar(gt)
-        if save:
-            logger.info("Writing grammar tables to %s", gp)
-            try:
-                g.dump(gp)
-            except OSError as e:
-                logger.info("Writing failed: %s", e)
-    else:
-        g = grammar.Grammar()
-        g.load(gp)
-    return g
+    with open(file) as f:
+        content = f.read()
+    return pgen.generate_grammar(content)
 
 
 def _newer(a, b):
@@ -160,22 +145,3 @@ def load_packaged_grammar(package, grammar_source):
     g = grammar.Grammar()
     g.loads(data)
     return g
-
-
-def main(*args):
-    """Main program, when run as a script: produce grammar pickle files.
-
-    Calls load_grammar for each argument, a path to a grammar text file.
-    """
-    if not args:
-        args = sys.argv[1:]
-    logging.basicConfig(
-        level=logging.INFO, stream=sys.stdout, format="%(message)s"
-    )
-    for gt in args:
-        load_grammar(gt, save=True, force=True)
-    return True
-
-
-if __name__ == "__main__":
-    sys.exit(int(not main()))

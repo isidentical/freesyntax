@@ -2,6 +2,8 @@
 # Licensed to PSF under a Contributor Agreement.
 
 # Pgen imports
+import io
+
 from . import grammar, token, tokenize
 
 
@@ -9,19 +11,13 @@ class PgenGrammar(grammar.Grammar):
     pass
 
 
-class ParserGenerator:
-    def __init__(self, filename, stream=None):
-        close_stream = None
-        if stream is None:
-            stream = open(filename)
-            close_stream = stream.close
-        self.filename = filename
-        self.stream = stream
-        self.generator = tokenize.generate_tokens(stream.readline)
+class ParserGenerator(object):
+    def __init__(self, source):
+        source = io.StringIO(source)
+        self.generator = tokenize.generate_tokens(source.readline)
         self.gettoken()  # Initialize lookahead
         self.dfas, self.startsymbol = self.parse()
-        if close_stream is not None:
-            close_stream()
+        source.close()
         self.first = {}  # map from symbol name to set of tokens
         self.addfirstsets()
 
@@ -344,11 +340,11 @@ class ParserGenerator:
             except:
                 msg = " ".join([msg] + list(map(str, args)))
         raise SyntaxError(
-            msg, (self.filename, self.end[0], self.end[1], self.line)
+            "<freesyntax>", (None, self.end[0], self.end[1], self.line)
         )
 
 
-class NFAState:
+class NFAState(object):
     def __init__(self):
         self.arcs = []  # list of (label, NFAState) pairs
 
@@ -358,7 +354,7 @@ class NFAState:
         self.arcs.append((label, next))
 
 
-class DFAState:
+class DFAState(object):
     def __init__(self, nfaset, final):
         assert isinstance(nfaset, dict)
         assert isinstance(next(iter(nfaset)), NFAState)
@@ -395,6 +391,6 @@ class DFAState:
     __hash__ = None  # For Py3 compatibility.
 
 
-def generate_grammar(filename="Grammar.txt"):
-    p = ParserGenerator(filename)
+def generate_grammar(source):
+    p = ParserGenerator(source)
     return p.make_grammar()

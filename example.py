@@ -1,11 +1,9 @@
-# FreeSyntax
-Syntactically Free Python
-
-```py
 from freesyntax.factory import RuleFactory
-from freesyntax.grammar import Optional, Token, Rule, Match
+from freesyntax.grammar import Match, Optional, Rule, Token
 from freesyntax.structs import AutoLeaf
+
 factory = RuleFactory()
+
 
 @factory.funcdef(
     Match["def"],
@@ -19,9 +17,11 @@ def fixer(node):
     node.children[3].replace(AutoLeaf.COLON)
 
 
-print(factory.transform("""
+print(
+    factory.transform(
+        """
 def a() YES
     pass
-"""))
-
-```
+"""
+    )
+)
