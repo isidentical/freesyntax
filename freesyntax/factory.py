@@ -79,13 +79,15 @@ class RuleProxy:
     factory: RuleFactory
 
     def __call__(self, *items):
-        self.factory.notify(self.rule, " ".join(map(str, items)))
-
         def wrapper(func):
             self.factory.transformers[self.rule] = func
             return func
 
-        return wrapper
+        if len(items) == 1 and callable(items[0]):
+            return wrapper(*items)
+        else:
+            self.factory.notify(self.rule, " ".join(map(str, items)))
+            return wrapper
 
 
 class RuleFactory:
