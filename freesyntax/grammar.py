@@ -47,3 +47,23 @@ class Optional(_GrammarRepresentative, requires_sequence=True):
 class Match(_GrammarRepresentative):
     def initalize_representative(self):
         self.value = f"{self.value!r}"
+
+
+class ZeroOrMore(_GrammarRepresentative):
+    def initalize_representative(self):
+        self.value = f"{self.value}*"
+
+
+class OneOrMore(_GrammarRepresentative):
+    def initalize_representative(self):
+        self.value = f"{self.value}+"
+
+
+class Unit(_GrammarRepresentative):
+    def initalize_representative(self):
+        self.value = f"({' '.join(map(str, self.value))})"
+
+
+class Or(_GrammarRepresentative):
+    def initalize_representative(self):
+        self.value = f"{' | '.join(map(str, self.value))}"
