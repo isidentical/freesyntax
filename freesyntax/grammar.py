@@ -16,6 +16,8 @@ class _GrammarRepresentative:
     def __post_init__(self):
         if self.requires_sequence and not isinstance(self.value, tuple):
             self.value = (self.value,)
+
+        self._old_value = self.value
         self.initalize_representative()
 
     def __str__(self):
@@ -59,11 +61,11 @@ class OneOrMore(_GrammarRepresentative):
         self.value = f"{self.value}+"
 
 
-class Unit(_GrammarRepresentative):
+class Unit(_GrammarRepresentative, requires_sequence=True):
     def initalize_representative(self):
         self.value = f"({' '.join(map(str, self.value))})"
 
 
-class Or(_GrammarRepresentative):
+class Or(_GrammarRepresentative, requires_sequence=True):
     def initalize_representative(self):
         self.value = f"{' | '.join(map(str, self.value))}"

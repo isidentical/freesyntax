@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import io
+import token
+import tokenize
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict
 
+from freesyntax.grammar import _GrammarRepresentative
 from freesyntax.lib2to3 import pygram, pytree
-from freesyntax.lib2to3.pgen2 import token, tokenize
 from freesyntax.lib2to3.pgen2.driver import Driver
 from freesyntax.lib2to3.pgen2.pgen import generate_grammar
+from freesyntax.parser import parse_rule
+from freesyntax.shortcuts import get_tokens
 
 GRAMMAR = Path(__file__).parent / "lib2to3" / "Grammar.txt"
 
@@ -17,10 +21,10 @@ GRAMMAR = Path(__file__).parent / "lib2to3" / "Grammar.txt"
 class RuleGrammar:
     raw_grammar: str
     rules: Dict[str, str] = field(default_factory=dict)
+    pyrules: Dict[str, _GrammarRepresentative] = field(default_factory=dict)
 
     def __post_init__(self):
-        readline = io.StringIO(self.raw_grammar)
-        tokens = tuple(tokenize.generate_tokens(readline.readline))
+        tokens = get_tokens(self.raw_grammar)
 
         buffer = []
         name = None
@@ -38,6 +42,12 @@ class RuleGrammar:
 
             return new_tokens
 
+        def add_rule():
+            rule_text = tokenize.untokenize(reset_lines(buffer[:-1]))
+            rule_text = rule_text.replace("\\", str())
+            self.pyrules[name] = parse_rule(rule_text)
+            self.rules[name] = rule_text.split()
+
         for current_token in tokens:
             if current_token[0] in {token.COMMENT, token.NEWLINE}:
                 continue
@@ -45,9 +55,7 @@ class RuleGrammar:
                 continue
 
             if len(buffer) > 1 and current_token[1] == ":":
-                self.rules[name] = tokenize.untokenize(
-                    reset_lines(buffer[:-1])
-                )
+                add_rule()
                 name = buffer[-1]
                 buffer.clear()
                 buffer.append(name)
@@ -57,15 +65,16 @@ class RuleGrammar:
             else:
                 buffer.append(current_token)
         else:
-            self.rules[name] = tokenize.untokenize(reset_lines(buffer[:-1]))
+            add_rule()
 
         self.regen_grammar()
 
     def _prepare_grammar(self):
-        return (
-            "\n".join(f"{name}:{rule}" for name, rule in self.rules.items())
-            + "\n"
-        )
+        rule_texts = []
+        for name, rule in self.rules.items():
+            rule_text = " ".join(map(str, rule))
+            rule_texts.append(f"{name}:{rule_text}")
+        return "\n".join(rule_texts) + "\n"
 
     def regen_grammar(self):
         self.grammar = generate_grammar(self._prepare_grammar())
@@ -86,7 +95,7 @@ class RuleProxy:
         if len(items) == 1 and callable(items[0]):
             return wrapper(*items)
         else:
-            self.factory.notify(self.rule, " ".join(map(str, items)))
+            self.factory.notify(self.rule, items)
             return wrapper
 
 
@@ -103,10 +112,10 @@ class RuleFactory:
             return RuleProxy(rule, self)
         raise AttributeError(rule)
 
-    def notify(self, rule_name, rule_string):
+    def notify(self, rule_name, rule_value):
         self.transformers.pop(rule_name, None)
         # when changing the rule, ensure the transformers are obsolete
-        self.rule_grammar.rules[rule_name] = rule_string
+        self.rule_grammar.rules[rule_name] = rule_value
         self.pgen2_driver.grammar = self.rule_grammar.regen_grammar()
 
     def transform(self, source):
