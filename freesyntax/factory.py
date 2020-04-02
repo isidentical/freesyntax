@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 import token
 import tokenize
 from dataclasses import dataclass, field
@@ -9,6 +10,9 @@ from typing import Dict
 
 from freesyntax.grammar import _GrammarRepresentative
 from freesyntax.lib2to3 import pygram, pytree
+from freesyntax.lib2to3.pgen2 import grammar as _grammar
+from freesyntax.lib2to3.pgen2 import token as _token
+from freesyntax.lib2to3.pgen2 import tokenize as _tokenize
 from freesyntax.lib2to3.pgen2.driver import Driver
 from freesyntax.lib2to3.pgen2.pgen import generate_grammar
 from freesyntax.parser import parse_rule
@@ -128,3 +132,22 @@ class RuleFactory:
                 if new := transformer(node):
                     node.replace(new)
         return str(tree)
+
+    def register_token(self, token, token_name):
+        token_slot = self._next_free_token_slot()
+        _token.tok_name[token_slot] = token_name
+        setattr(_token, token_name, token_slot)
+        _grammar.opmap[token] = token_slot
+        _grammar.opvalue[token_name] = token
+        _tokenize.EXACT_TOKEN_TYPES[token] = token_slot
+        _tokenize.PseudoToken = _tokenize.Whitespace + _tokenize.group(
+            re.escape(token),
+            _tokenize.PseudoExtras,
+            _tokenize.Number,
+            _tokenize.Funny,
+            _tokenize.ContStr,
+            _tokenize.Name,
+        )
+
+    def _next_free_token_slot(self):
+        return max(_token.tok_name.keys() ^ {256}) + 1
