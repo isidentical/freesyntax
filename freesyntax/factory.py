@@ -17,6 +17,7 @@ from freesyntax.lib2to3.pgen2.driver import Driver
 from freesyntax.lib2to3.pgen2.pgen import generate_grammar
 from freesyntax.parser import parse_rule
 from freesyntax.shortcuts import get_tokens
+from freesyntax.structs import Symbols
 
 GRAMMAR = Path(__file__).parent / "lib2to3" / "Grammar.txt"
 
@@ -121,6 +122,10 @@ class RuleFactory:
         # when changing the rule, ensure the transformers are obsolete
         self.rule_grammar.rules[rule_name] = rule_value
         self.pgen2_driver.grammar = self.rule_grammar.regen_grammar()
+        self.bind_syms()
+
+    def bind_syms(self):
+        Symbols.factory = self
 
     def transform(self, source):
         tree = self.pgen2_driver.parse_string(source)

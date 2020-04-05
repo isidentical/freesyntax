@@ -1,5 +1,6 @@
-from freesyntax.lib2to3.pgen2 import grammar
-from freesyntax.lib2to3.pytree import Leaf
+from freesyntax.lib2to3.fixer_util import *
+from freesyntax.lib2to3.pgen2 import grammar, token
+from freesyntax.lib2to3.pytree import *
 
 
 class _AutoMeta(type):
@@ -15,3 +16,17 @@ class AutoLeaf(metaclass=_AutoMeta):
             return Leaf(grammar.opmap[value], value)
         else:
             raise ValueError(f"Unknown token, {token}!")
+
+
+class Tokens(metaclass=_AutoMeta):
+    @staticmethod
+    def auto(value):
+        return getattr(token, value)
+
+
+class Symbols(metaclass=_AutoMeta):
+    @classmethod
+    def auto(cls, value):
+        if not hasattr(cls, "factory"):
+            raise ValueError("Factory is not bound!")
+        return cls.factory.rule_grammar.grammar.symbol2number[value]
