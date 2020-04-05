@@ -21,7 +21,7 @@ class _GrammarRepresentative:
         self.initalize_representative()
 
     def __str__(self):
-        return self.value
+        return self._value
 
     def __class_getitem__(cls, value):
         return cls(value)
@@ -30,42 +30,46 @@ class _GrammarRepresentative:
 class Token(_GrammarRepresentative):
     def initalize_representative(self):
         if hasattr(token, self.value.upper()):
-            self.value = self.value.upper()
+            self._value = self.value.upper()
         else:
             raise ValueError(f"Unknown token, {self.value}!")
 
 
 class Rule(_GrammarRepresentative):
     def initalize_representative(self):
-        # TODO: resolve this rule in the rule factory
-        pass
+        self._value = self.value
 
 
 class Optional(_GrammarRepresentative, requires_sequence=True):
     def initalize_representative(self):
-        self.value = f"[{' '.join(map(str, self.value))}]"
+        self._value = f"[{' '.join(map(str, self.value))}]"
 
 
 class Match(_GrammarRepresentative):
     def initalize_representative(self):
-        self.value = f"{self.value!r}"
+        self._value = f"{self.value!r}"
 
 
 class ZeroOrMore(_GrammarRepresentative):
     def initalize_representative(self):
-        self.value = f"{self.value}*"
+        self._value = f"{self.value}*"
 
 
 class OneOrMore(_GrammarRepresentative):
     def initalize_representative(self):
-        self.value = f"{self.value}+"
+        self._value = f"{self.value}+"
 
 
 class Unit(_GrammarRepresentative, requires_sequence=True):
     def initalize_representative(self):
-        self.value = f"({' '.join(map(str, self.value))})"
+        self._value = f"({' '.join(map(str, self.value))})"
+
+
+class FreeUnit(_GrammarRepresentative, requires_sequence=True):
+    def initalize_representative(self):
+        self._value = " ".join(map(str, self.value))
 
 
 class Or(_GrammarRepresentative, requires_sequence=True):
     def initalize_representative(self):
-        self.value = f"{' | '.join(map(str, self.value))}"
+        self._value = f"{' | '.join(map(str, self.value))}"

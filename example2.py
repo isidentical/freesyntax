@@ -11,7 +11,7 @@ from freesyntax.structs import (
 )
 
 factory = RuleFactory()
-factory.register_token("!", "FUCKOFF")
+factory.register_token("!", "MARK")
 
 
 @factory.trailer(
@@ -20,10 +20,10 @@ factory.register_token("!", "FUCKOFF")
         Unit[Match["["], Rule["subscriptlist"], Match["]"],],
         Unit[Match["."], Token["NAME"],],
     ],
-    Optional[Token["FUCKOFF"]],
+    Optional[Token["MARK"]],
 )
 def fix_trailer(trailer):
-    if trailer.children[-1].type == Tokens.FUCKOFF:
+    if trailer.children[-1].type == Tokens.MARK:
         trailer.children[-1].remove()
         start = trailer.parent.children.index(trailer)
         children = trailer.parent.children[: start + 1]

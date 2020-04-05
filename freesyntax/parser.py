@@ -1,63 +1,124 @@
 import token
+from contextlib import contextmanager, suppress
 
 from freesyntax import grammar
 from freesyntax.shortcuts import get_tokens, untokenize
+
+IGNORED = frozenset((token.NEWLINE, token.COMMENT, token.NL))
+DEBUG = True
+
+
+class Finish(Exception):
+    pass
+
+
+class ExpectationReached(Exception):
+    pass
 
 
 class RuleParser:
     def __init__(self, source):
         self.tokens = list(get_tokens(source))
-        self.state = self.tokens[0]
+        self.state = self.tokens.pop(0)
+        self.result = []
+        self.contexts = []
 
     def eat(self):
+        if len(self.tokens) == 0:
+            raise Finish
+        if (
+            len(self.contexts) > 0
+            and self.state.exact_type == self.contexts[-1]
+        ):
+            raise ExpectationReached
         self.state = self.tokens.pop(0)
+        if self.state.exact_type == token.ENDMARKER:
+            raise Finish
+        if (
+            len(self.contexts) > 0
+            and self.state.exact_type == self.contexts[-1]
+        ):
+            raise Finish
+        return self.state
+
+    @contextmanager
+    def sub_context(self, expected):
+        buffer = []
+        _result = self.result
+        self.result = buffer
+        self.contexts.append(expected)
+        try:
+            yield buffer
+        except ExpectationReached:
+            pass
+        finally:
+            self.contexts.pop()
+            self.result = _result.copy()
 
     def parse_until(self, expected):
-        buffer = []
-        while self.state.exact_type not in {expected, token.ENDMARKER}:
-            if result := self.parse():
-                buffer.append(result)
-            else:
-                raise ValueError
+        with self.sub_context(expected) as buffer:
+            while self.eat().exact_type != expected:
+                buffer.append(self.parse_single())
+
         return buffer
 
-    def parse(self):
+    def parse_single(self):
         rule = []
-        while self.state.exact_type != token.ENDMARKER:
-            try:
-                self.eat()
-            except IndexError:
-                break
 
-            if self.state.exact_type == token.LBRACE:
-                rule.append(grammar.Unit[self.parse_until(token.RBRACE)])
-
-            if self.state.exact_type == token.LSQB:
-                rule.append(grammar.Optional[self.parse_until(token.RSQB)])
-
-            if self.state.exact_type == token.NAME:
-                if self.state.string.isupper():
-                    rule.append(grammar.Token[self.state.string])
-                elif self.state.string.islower():
-                    rule.append(grammar.Rule[self.state.string])
+        def unwrap(items):
+            for item in items:
+                if isinstance(item, tuple):
+                    yield from item
                 else:
-                    raise ValueError(
-                        f"Unknown grammar item, '{self.state.string}'."
-                    )
+                    yield item
 
-            if self.state.exact_type == token.STRING:
-                rule.append(grammar.Match[self.state.string])
+        if self.state.exact_type == token.LBRACE:
+            return grammar.Unit[tuple(unwrap(self.parse_until(token.RBRACE)))]
+        elif self.state.exact_type == token.LSQB:
+            return grammar.Optional[
+                tuple(unwrap(self.parse_until(token.RSQB)))
+            ]
+        elif self.state.exact_type == token.LPAR:
+            return grammar.Unit[tuple(unwrap(self.parse_until(token.RPAR)))]
+        elif self.state.exact_type == token.NAME:
+            if self.state.string.isupper():
+                return grammar.Token[self.state.string]
+            elif self.state.string.islower():
+                return grammar.Rule[self.state.string]
+            else:
+                raise ValueError(
+                    f"Unknown grammar item, '{self.state.string}'."
+                )
+        elif self.state.exact_type == token.STRING:
+            return grammar.Match[self.state.string[1:-1]]
+        elif self.state.exact_type == token.STAR and len(self.result) > 0:
+            return grammar.ZeroOrMore[self.result.pop()]
+        elif self.state.exact_type == token.PLUS and len(self.result) > 0:
+            return grammar.OneOrMore[self.result.pop()]
+        elif self.state.exact_type == token.VBAR and len(self.result) > 0:
+            left = grammar.FreeUnit(tuple(self.result))
+            self.result.clear()
+            self.eat()
+            with suppress(Finish):
+                self.parse()
+            right = grammar.FreeUnit(tuple(self.result))
+            self.result.clear()
+            return grammar.Or[(left, right)]
+        elif self.state.exact_type in IGNORED:
+            self.eat()
+            return self.parse_single()
+        else:
+            pass
+            # Still WIP TO:DO
 
-            if self.state.exact_type == token.STAR and len(rule) > 0:
-                rule.append(grammar.ZeroOrMore[rule[-1]])
+    def parse(self):
+        with suppress(Finish):
+            while self.state.exact_type != token.ENDMARKER:
+                result = self.parse_single()
+                self.result.append(result)
+                self.eat()
 
-            if self.state.exact_type == token.PLUS and len(rule) > 1:
-                rule.append(grammar.OneOrMore[rule[-1]])
-
-            if self.state.exact_type == token.VBAR and len(rule) > 1:
-                rule.append(grammar.Or[rule[-1], self.parse()])
-
-        return tuple(rule)
+        return tuple(self.result)
 
 
 def parse_rule(source):
